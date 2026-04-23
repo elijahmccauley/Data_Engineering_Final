@@ -172,7 +172,7 @@ def generate_tabular_text_description(
     Generate an enriched description that combines the tabular profile with
     semantic insights extracted from the dataset's text columns.
 
-    This is the text-enhanced variant (your contribution, Yuheng).
+    This is the text-enhanced variant.
     """
     prompt = _build_tabular_text_prompt(
         dataset_name, compact_profile, text_semantic_summary, text_samples
