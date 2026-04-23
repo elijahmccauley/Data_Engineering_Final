@@ -187,3 +187,92 @@ def generate_tabular_text_description(
         temperature=0.3,
         client=client,
     )
+    
+
+# ── 4. LLM — Multimodal description (tabular + text + image) ──────────────────
+
+def _build_multimodal_prompt(
+    dataset_name: str,
+    compact_profile: dict,
+    text_semantic_summary: str,
+    text_samples: dict[str, list[str]],
+    image_semantic_summary: str,
+    image_captions: list[str],
+) -> str:
+    sample_lines = []
+    for col, vals in text_samples.items():
+        sample_lines.append(f"Column '{col}' samples:")
+        sample_lines += [f"  - {v}" for v in vals[:10]]
+        
+    caption_lines = [f"  - {cap}" for cap in image_captions[:10]]
+
+    return f"""You are generating a comprehensive dataset description for a data catalogue.
+
+Dataset name: {dataset_name}
+
+Structured profile:
+{json.dumps(compact_profile, indent=2)}
+
+Semantic summary of text fields:
+{text_semantic_summary}
+
+Sample text values:
+{chr(10).join(sample_lines)}
+
+Semantic summary of visual fields (derived from image models):
+{image_semantic_summary}
+
+Sample image captions:
+{chr(10).join(caption_lines)}
+
+Write a clear, informative description that covers:
+1. What the dataset is about and its overall domain.
+2. What entities or items it contains (use real examples from the text and image samples).
+3. Its main attributes, structure, and tabular statistics.
+4. Semantic insights drawn from the text fields (themes, brands, sentiment).
+5. Visual insights drawn from the image data (colors, object types, visual properties).
+6. What multimodal analytical or machine learning tasks it can support.
+
+Rules:
+- Only use information present in the profile, summaries, and samples above.
+- Do not invent brands, fields, visual details, or statistics not listed.
+- Incorporate specific product and visual examples where relevant.
+- Be concise but highly descriptive, integrating all three modalities.
+- Length: 250–350 words."""
+
+
+def generate_multimodal_description(
+    dataset_name: str,
+    compact_profile: dict,
+    text_semantic_summary: str,
+    text_samples: dict[str, list[str]],
+    image_semantic_summary: str,
+    image_captions: list[str],
+    client: OpenAI | None = None,
+    model: str = config.DEFAULT_MODEL,
+) -> str:
+    """
+    Generate an enriched description that combines the tabular profile, 
+    semantic text insights, and visual image insights.
+    
+    This is the fully multimodal extension.
+    """
+    prompt = _build_multimodal_prompt(
+        dataset_name, 
+        compact_profile, 
+        text_semantic_summary, 
+        text_samples,
+        image_semantic_summary,
+        image_captions
+    )
+    return call_openai(
+        prompt=prompt,
+        system_message=(
+            "You generate high-quality multimodal dataset descriptions that combine "
+            "structured tabular data, semantic text insights, and visual image data. "
+            "Be factual, specific, and seamlessly weave the modalities together."
+        ),
+        model=model,
+        temperature=0.3,
+        client=client,
+    )
