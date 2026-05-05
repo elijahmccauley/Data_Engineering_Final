@@ -3,7 +3,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from modules import (
+from multimodal_autoddg import (
     profiling,
     description_generation,
     text_processing,
@@ -37,7 +37,7 @@ def scan_dataset_directory(base_path):
                     
     return dataset_assets
 
-def run_pipeline(df: pd.DataFrame, image_folder: str = None, dataset_name: str = DATASET_NAME):
+def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str = DATASET_NAME, use_koesten_prompt: bool = False):
     """
     Master pipeline that dynamically routes data through the appropriate profilers
     and generates the highest-fidelity description possible.
@@ -67,29 +67,30 @@ def run_pipeline(df: pd.DataFrame, image_folder: str = None, dataset_name: str =
     image_semantic_summary = ""
     image_captions = []
     
-    if image_folder and os.path.exists(image_folder):
-        print(f"3. Processing Images in {image_folder} via BLIP...")
-        # Get raw captions [(caption, filename), ...]
-        raw_captions = image_processing.generate_image_captions(image_folder, sample_size=10)
-        image_captions = [cap[0] for cap in raw_captions]
-        
-        # Compress into semantic summary
-        image_semantic_summary = image_processing.generate_image_semantic_summary(
-            dataset_name=dataset_name,
-            image_captions=image_captions,
-            client=client
-        )
+    if image_folders:
+        print(f"3. Processing Images across {len(image_folders)} folder(s) via BLIP...")
+        for folder in image_folders:
+            if os.path.exists(folder):
+                raw_captions = image_processing.generate_image_captions(folder, sample_size=30)
+                image_captions.extend([cap[0] for cap in raw_captions])
+                
+        if image_captions:
+            image_semantic_summary = image_processing.generate_image_semantic_summary(
+                dataset_name=dataset_name,
+                image_captions=image_captions,
+                client=client
+            )
     else:
-        print("3. No valid image folder provided. Skipping vision pipeline.")
+        print("3. No valid image folders detected. Skipping vision pipeline.")
 
     # STEP 4: Routing to the correct Generator
-    print("4. Generating Final Description...")
+    print(f"4. Generating Final Description, (Koesten Prompt: {use_koesten_prompt})...")
     
     if image_captions and text_cols:
         # 1. Full Multimodal (Tabular + Text + Image)
         desc = description_generation.generate_multimodal_description(
             dataset_name, compact_profile, text_semantic_summary, 
-            text_samples, image_semantic_summary, image_captions, client=client
+            text_samples, image_semantic_summary, image_captions, client=client, use_koesten_prompt=use_koesten_prompt
         )
     elif image_captions:
         # 2. Tabular + Image (NO Semantic Text)
@@ -99,23 +100,23 @@ def run_pipeline(df: pd.DataFrame, image_folder: str = None, dataset_name: str =
             text_samples={}, 
             image_semantic_summary=image_semantic_summary, 
             image_captions=image_captions, 
-            client=client
+            client=client, use_koesten_prompt=use_koesten_prompt
         )
     elif text_cols:
         # 3. Tabular + Text 
         desc = description_generation.generate_tabular_text_description(
-            dataset_name, compact_profile, text_semantic_summary, text_samples, client=client
+            dataset_name, compact_profile, text_semantic_summary, text_samples, client=client, use_koesten_prompt=use_koesten_prompt
         )
     else:
         # 4. Tabular Only (Original AutoDDG)
         desc = description_generation.generate_tabular_only_description(
-            dataset_name, compact_profile, client=client
+            dataset_name, compact_profile, client=client, use_koesten_prompt=use_koesten_prompt
         )
         
     return desc
 
 
-def run_ablation_study(csv_path: str, image_folder: str, text_columns_to_drop: list):
+def run_ablation_study(csv_path: str, image_folders: list):
     """
     Executes the 4-part test.
     """
@@ -127,25 +128,30 @@ def run_ablation_study(csv_path: str, image_folder: str, text_columns_to_drop: l
     
     # Create the ablated dataset (mimicking a CSV with bad/missing text)
     # We use errors='ignore' so it doesn't crash if a column is already missing
+    text_columns_to_drop = text_processing.detect_semantic_text_columns(base_df)
     ablated_df = base_df.drop(columns=text_columns_to_drop, errors='ignore')
     
     descriptions = {}
     
     # 1. Baseline AutoDDG (Full DF, No Images)
     print("\n>>> TEST 1: Baseline AutoDDG (Full Text, No Images)")
-    descriptions["AutoDDG_Baseline"] = run_pipeline(base_df, image_folder=None, dataset_name=f"{DATASET_NAME} (Baseline)")
+    descriptions["AutoDDG_Baseline"] = run_pipeline(base_df, image_folders=None, dataset_name=f"{DATASET_NAME} (Baseline)")
     
     # 2. Text-Ablated AutoDDG (Ablated DF, No Images)
     print("\n>>> TEST 2: Text-Ablated AutoDDG (No Semantic Text, No Images)")
-    descriptions["AutoDDG_Ablated"] = run_pipeline(ablated_df, image_folder=None, dataset_name=f"{DATASET_NAME} (Ablated)")
+    descriptions["AutoDDG_Ablated"] = run_pipeline(ablated_df, image_folders=None, dataset_name=f"{DATASET_NAME} (Ablated)")
     
     # 3. Multimodal Baseline (Full DF, With Images)
     print("\n>>> TEST 3: Multimodal Baseline (Full Text, WITH Images)")
-    descriptions["Multimodal_Baseline"] = run_pipeline(base_df, image_folder=image_folder, dataset_name=f"{DATASET_NAME} (Multimodal)")
+    descriptions["Multimodal_Baseline"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal)")
     
-    # 4. Multimodal Text-Ablated (Ablated DF, With Images)
-    print("\n>>> TEST 4: Multimodal Ablated (No Semantic Text, WITH Images)")
-    descriptions["Multimodal_Ablated"] = run_pipeline(ablated_df, image_folder=image_folder, dataset_name=f"{DATASET_NAME} (Multimodal Ablated)")
+    # 4. Multimodal Baseline (KOESTEN PROMPT) <-- THE NEW TEST
+    print("\n>>> TEST 4: Multimodal Koesten (Full Text, WITH Images, KOESTEN PROMPT)")
+    descriptions["Multimodal_Koesten"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal + Koesten)", use_koesten_prompt=True)
+    
+    # 5. Multimodal Text-Ablated (Ablated DF, With Images)
+    print("\n>>> TEST 5: Multimodal Ablated (No Semantic Text, WITH Images)")
+    descriptions["Multimodal_Ablated"] = run_pipeline(ablated_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal Ablated)")
     
     # STEP 5: Run Yuheng's Evaluator on the results
     print("\n" + "="*50)

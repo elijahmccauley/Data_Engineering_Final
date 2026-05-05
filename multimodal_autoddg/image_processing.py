@@ -14,7 +14,9 @@ def generate_image_captions(image_folder, sample_size=50):
     Takes a folder of images, generates captions for a random sample, and returns a list of captions.
     """
     captions = []
-    image_files = os.listdir(image_folder)[:sample_size]  # Limit to sample size
+    valid_exts = ('.png', '.jpg', '.jpeg', '.webp')
+    all_files = os.listdir(image_folder)
+    image_files = [f for f in all_files if f.lower().endswith(valid_exts)][:sample_size]
     
     for file in image_files:
         #print(file)

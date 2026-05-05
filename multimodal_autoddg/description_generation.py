@@ -75,7 +75,7 @@ def generate_rule_based_description(df: pd.DataFrame) -> str:
 
 # ── 2. LLM — tabular-only description ─────────────────────────────────────────
 
-def _build_tabular_only_prompt(dataset_name: str, compact_profile: dict) -> str:
+def _build_tabular_only_prompt(dataset_name: str, compact_profile: dict, use_koesten_prompt: bool = False) -> str:
     return f"""You are generating a dataset description for a data catalogue.
 
 Dataset name: {dataset_name}
@@ -101,12 +101,13 @@ def generate_tabular_only_description(
     compact_profile: dict,
     client: OpenAI | None = None,
     model: str = config.DEFAULT_MODEL,
+    use_koesten_prompt: bool = False,
 ) -> str:
     """
     Generate a description using only the structured tabular profile (no text).
     This is the AutoDDG baseline approach.
     """
-    prompt = _build_tabular_only_prompt(dataset_name, compact_profile)
+    prompt = _build_tabular_only_prompt(dataset_name, compact_profile, use_koesten_prompt=use_koesten_prompt)
     return call_openai(
         prompt=prompt,
         system_message=(
@@ -126,6 +127,7 @@ def _build_tabular_text_prompt(
     compact_profile: dict,
     text_semantic_summary: str,
     text_samples: dict[str, list[str]],
+    use_koesten_prompt: bool = False,
 ) -> str:
     sample_lines = []
     for col, vals in text_samples.items():
@@ -167,6 +169,7 @@ def generate_tabular_text_description(
     text_samples: dict[str, list[str]],
     client: OpenAI | None = None,
     model: str = config.DEFAULT_MODEL,
+    use_koesten_prompt: bool = False,
 ) -> str:
     """
     Generate an enriched description that combines the tabular profile with
@@ -175,7 +178,7 @@ def generate_tabular_text_description(
     This is the text-enhanced variant.
     """
     prompt = _build_tabular_text_prompt(
-        dataset_name, compact_profile, text_semantic_summary, text_samples
+        dataset_name, compact_profile, text_semantic_summary, text_samples, use_koesten_prompt=use_koesten_prompt
     )
     return call_openai(
         prompt=prompt,
@@ -198,6 +201,7 @@ def _build_multimodal_prompt(
     text_samples: dict[str, list[str]],
     image_semantic_summary: str,
     image_captions: list[str],
+    use_koesten_prompt: bool = False,
 ) -> str:
     sample_lines = []
     for col, vals in text_samples.items():
@@ -206,7 +210,7 @@ def _build_multimodal_prompt(
         
     caption_lines = [f"  - {cap}" for cap in image_captions[:10]]
 
-    return f"""You are generating a comprehensive dataset description for a data catalogue.
+    prompt = f"""You are generating a comprehensive dataset description for a data catalogue.
 
 Dataset name: {dataset_name}
 
@@ -239,6 +243,18 @@ Rules:
 - Incorporate specific product and visual examples where relevant.
 - Be concise but highly descriptive, integrating all three modalities.
 - Length: 250–350 words."""
+    if use_koesten_prompt:
+        prompt += """\n\nEnsure your description explicitly answers the following questions:
+1. How would you describe the dataset in one sentence?
+2. What does the dataset look like?
+3. What are the headers? Can you group them in a sensible way? Is there a key column?
+4. What are the value types and value ranges for the most important headers?
+5. Where is the data from? When was it collected or published?
+6. In what way does the dataset mention time?
+7. In what way does the dataset mention location?
+8. Is there anything unclear about the data, or do you have reason to doubt the quality?
+9. Is there anything that you would like to point out or analyze in more detail?"""
+    return prompt
 
 
 def generate_multimodal_description(
@@ -250,6 +266,7 @@ def generate_multimodal_description(
     image_captions: list[str],
     client: OpenAI | None = None,
     model: str = config.DEFAULT_MODEL,
+    use_koesten_prompt: bool = False,
 ) -> str:
     """
     Generate an enriched description that combines the tabular profile, 
@@ -263,7 +280,8 @@ def generate_multimodal_description(
         text_semantic_summary, 
         text_samples,
         image_semantic_summary,
-        image_captions
+        image_captions,
+        use_koesten_prompt=use_koesten_prompt
     )
     return call_openai(
         prompt=prompt,
