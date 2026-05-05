@@ -202,6 +202,7 @@ def _build_multimodal_prompt(
     image_semantic_summary: str,
     image_captions: list[str],
     use_koesten_prompt: bool = False,
+    persona: str = "general",  # or "sales"
 ) -> str:
     sample_lines = []
     for col, vals in text_samples.items():
@@ -229,31 +230,49 @@ Semantic summary of visual fields (derived from image models):
 Sample image captions:
 {chr(10).join(caption_lines)}
 
-Write a clear, informative description that covers:
-1. What the dataset is about and its overall domain.
-2. What entities or items it contains (use real examples from the text and image samples).
-3. Its main attributes, structure, and tabular statistics.
-4. Semantic insights drawn from the text fields (themes, brands, sentiment).
-5. Visual insights drawn from the image data (colors, object types, visual properties).
-6. What multimodal analytical or machine learning tasks it can support.
-
 Rules:
 - Only use information present in the profile, summaries, and samples above.
 - Do not invent brands, fields, visual details, or statistics not listed.
 - Incorporate specific product and visual examples where relevant.
 - Be concise but highly descriptive, integrating all three modalities.
 - Length: 250–350 words."""
-    if use_koesten_prompt:
-        prompt += """\n\nEnsure your description explicitly answers the following questions:
-1. How would you describe the dataset in one sentence?
-2. What does the dataset look like?
-3. What are the headers? Can you group them in a sensible way? Is there a key column?
-4. What are the value types and value ranges for the most important headers?
-5. Where is the data from? When was it collected or published?
-6. In what way does the dataset mention time?
-7. In what way does the dataset mention location?
-8. Is there anything unclear about the data, or do you have reason to doubt the quality?
-9. Is there anything that you would like to point out or analyze in more detail?"""
+
+    if persona == "sales":
+        prompt += """\nWrite a clear, informative description tailored strictly for a Sales & Marketing Subject Matter Expert. Focus heavily on business value, pricing trends, target demographics, and product visuals. Do not mention technical details like null values, data types (e.g., int64, object), or row counts."""
+
+        if use_koesten_prompt:
+            prompt += """\n\nEnsure your description explicitly answers the following questions:
+                1. What is the dataset about, from a business and market perspective?
+                2. What does each row represent from a marketing point of view?
+                3. What are the key fields and how do they map to useful marketing dimensions?
+                4. What key variables are present for targeting, positioning, pricing, or performance analysis?
+                5. Where does the data come from, and how trustworthy is it for marketing use?
+                6. What time period does the dataset cover?
+                7. What market or geographic information is available?
+                8. What quality limitations could mislead marketing decisions?
+                9. What important marketing questions can this dataset help answer?"""
+    else:
+        prompt += """\nWrite a clear, informative description tailored for a Data Scientist. Include a technical breakdown of the specific tabular, visual, and textual modalities.
+        
+            Write a clear, informative description that covers:
+            1. What the dataset is about and its overall domain.
+            2. What entities or items it contains.
+            3. Its main attributes, structure, and tabular statistics.
+            4. Semantic insights drawn from the text fields.
+            5. Visual insights drawn from the image data.
+            6. What multimodal analytical or machine learning tasks it can support."""
+
+        if use_koesten_prompt:
+            prompt += """\n\nEnsure your description explicitly answers the following questions:
+                1. What is the dataset about, from a research and analytical perspective?
+                2. What does each row represent from a modeling or inference point of view?
+                3. What are the most important fields and analytical dimensions?
+                4. What key variables and value types matter for analysis or modeling?
+                5. Where does the data come from, and how trustworthy is it for research use?
+                6. What time period does the dataset cover?
+                7. What geographic, population, or observational scope does the dataset cover?
+                8. What quality limitations affect analysis or interpretation?
+                9. What research questions can this dataset help answer?"""
     return prompt
 
 
@@ -267,6 +286,7 @@ def generate_multimodal_description(
     client: OpenAI | None = None,
     model: str = config.DEFAULT_MODEL,
     use_koesten_prompt: bool = False,
+    persona: str = "general",  # or "sales"
 ) -> str:
     """
     Generate an enriched description that combines the tabular profile, 
@@ -281,7 +301,8 @@ def generate_multimodal_description(
         text_samples,
         image_semantic_summary,
         image_captions,
-        use_koesten_prompt=use_koesten_prompt
+        use_koesten_prompt=use_koesten_prompt,
+        persona=persona,
     )
     return call_openai(
         prompt=prompt,

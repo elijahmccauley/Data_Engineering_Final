@@ -37,7 +37,7 @@ def scan_dataset_directory(base_path):
                     
     return dataset_assets
 
-def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str = DATASET_NAME, use_koesten_prompt: bool = False):
+def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str = DATASET_NAME, use_koesten_prompt: bool = False, persona: str = "general"):
     """
     Master pipeline that dynamically routes data through the appropriate profilers
     and generates the highest-fidelity description possible.
@@ -84,13 +84,13 @@ def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str
         print("3. No valid image folders detected. Skipping vision pipeline.")
 
     # STEP 4: Routing to the correct Generator
-    print(f"4. Generating Final Description, (Koesten Prompt: {use_koesten_prompt})...")
+    print(f"4. Generating Final Description with Persona: {persona}, (Koesten Prompt: {use_koesten_prompt})...")
     
     if image_captions and text_cols:
         # 1. Full Multimodal (Tabular + Text + Image)
         desc = description_generation.generate_multimodal_description(
             dataset_name, compact_profile, text_semantic_summary, 
-            text_samples, image_semantic_summary, image_captions, client=client, use_koesten_prompt=use_koesten_prompt
+            text_samples, image_semantic_summary, image_captions, client=client, use_koesten_prompt=use_koesten_prompt, persona=persona
         )
     elif image_captions:
         # 2. Tabular + Image (NO Semantic Text)
@@ -100,7 +100,7 @@ def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str
             text_samples={}, 
             image_semantic_summary=image_semantic_summary, 
             image_captions=image_captions, 
-            client=client, use_koesten_prompt=use_koesten_prompt
+            client=client, use_koesten_prompt=use_koesten_prompt, persona=persona
         )
     elif text_cols:
         # 3. Tabular + Text 
@@ -116,7 +116,7 @@ def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str
     return desc
 
 
-def run_ablation_study(csv_path: str, image_folders: list):
+def run_ablation_study(csv_path: str, image_folders: list, persona: str = "general"):
     """
     Executes the 4-part test.
     """
@@ -143,15 +143,15 @@ def run_ablation_study(csv_path: str, image_folders: list):
     
     # 3. Multimodal Baseline (Full DF, With Images)
     print("\n>>> TEST 3: Multimodal Baseline (Full Text, WITH Images)")
-    descriptions["Multimodal_Baseline"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal)")
+    descriptions["Multimodal_Baseline"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal)", persona=persona)
     
     # 4. Multimodal Baseline (KOESTEN PROMPT) <-- THE NEW TEST
     print("\n>>> TEST 4: Multimodal Koesten (Full Text, WITH Images, KOESTEN PROMPT)")
-    descriptions["Multimodal_Koesten"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal + Koesten)", use_koesten_prompt=True)
+    descriptions["Multimodal_Koesten"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal + Koesten)", use_koesten_prompt=True, persona=persona)
     
     # 5. Multimodal Text-Ablated (Ablated DF, With Images)
     print("\n>>> TEST 5: Multimodal Ablated (No Semantic Text, WITH Images)")
-    descriptions["Multimodal_Ablated"] = run_pipeline(ablated_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal Ablated)")
+    descriptions["Multimodal_Ablated"] = run_pipeline(ablated_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal Ablated)", use_koesten_prompt=True, persona=persona)
     
     # STEP 5: Run Yuheng's Evaluator on the results
     print("\n" + "="*50)
@@ -218,5 +218,5 @@ if __name__ == "__main__":
     
     run_ablation_study(
         csv_path=target_csv_path, 
-        image_folders=detected_image_folders
+        image_folders=detected_image_folders, persona="sales"  # You can switch to "general" if you want a more neutral description
     )
