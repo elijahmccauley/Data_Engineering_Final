@@ -350,3 +350,28 @@ def evaluate_question_based(
             results[name] = {"raw_output": raw, "parse_error": True}
 
     return results
+
+
+KOESTEN_PROMPT = """You are an expert Data Scientist and a strict Dataset Catalog Evaluator. 
+Your task is to evaluate a generated dataset description based on how well it answers a specific set of 9 questions.
+
+For each question, read the description and assign a score based on this strict rubric:
+- 0.0 (Not answered): The description completely ignores this question or provides no relevant information.
+- 0.5 (Partially answered): The description touches on the topic but lacks specific details, relies on vague statements, or implies the answer without explicitly stating it.
+- 1.0 (Fully answered): The description explicitly, directly, and clearly answers the question with concrete details (e.g., listing exact column names, precise timeframes, specific target demographics, or explicitly stating if data is missing).
+
+To ensure accurate grading, you must provide a 1-2 sentence rationale for your evaluation BEFORE assigning the final number. Be highly critical. Do not give a 1.0 unless the answer is explicitly in the text.
+
+Here are the 9 questions you must evaluate against:
+[INSERT QUESTION SET HERE]
+
+Here is the dataset description to evaluate:
+[INSERT DESCRIPTION HERE]
+
+
+Please provide your output in the following exact format for all 9 questions:
+**Question [X]:** [Text of the question]
+**Rationale:** [Your 1-2 sentence explanation quoting what is present or noting what is missing]
+**Score:** [0.0, 0.5, or 1.0]
+
+At the very end, provide the **Total Score** (out of 9.0)."""
