@@ -360,14 +360,15 @@ For each question, read the description and assign a score based on this strict 
 - 0.5 (Partially answered): The description touches on the topic but lacks specific details, relies on vague statements, or implies the answer without explicitly stating it.
 - 1.0 (Fully answered): The description explicitly, directly, and clearly answers the question with concrete details (e.g., listing exact column names, precise timeframes, specific target demographics, or explicitly stating if data is missing).
 
-To ensure accurate grading, you must provide a 1-2 sentence rationale for your evaluation BEFORE assigning the final number. Be highly critical. Do not give a 1.0 unless the answer is explicitly in the text.
+To ensure accurate grading, you must provide a 1-2 sentence rationale for your evaluation BEFORE assigning the final number. Be highly critical. Do not give a 1.0 unless the answer is explicitly in the text. Only use information inside the triple quotes. Do not use outside knowledge.
 
 Here are the 9 questions you must evaluate against:
 [INSERT QUESTION SET HERE]
 
 Here is the dataset description to evaluate:
+'''
 [INSERT DESCRIPTION HERE]
-
+'''
 
 Please provide your output in the following exact format for all 9 questions:
 **Question [X]:** [Text of the question]

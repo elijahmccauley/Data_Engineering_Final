@@ -1,0 +1,8 @@
+requests
+numpy
+python-dotenv
+pandas
+openai
+Pillow
+transformers
+torch
