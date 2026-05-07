@@ -15,7 +15,10 @@ from multimodal_autoddg import (
 
 load_dotenv(".secrets")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-DATASET_NAME = "Amazon ecommerce"
+DATASET_NAME = "Amazon Clothing"    # Valid: "Amazon Clothing", "Amazon Tech", "Gingivitis"
+DATA_PATH = "./amazon_clothes"      # Ensure your local data path matches this
+PERSONA = "general"                 # Valid: "general", "sales"
+USE_KOESTEN_PROMPT = True           # Valid: True, False
 
 def scan_dataset_directory(base_path):
     """
@@ -136,21 +139,19 @@ def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str
 
 def run_ablation_study(csv_path: str, image_folders: list, persona: str = "general"):
     """
-    Executes the 4-part test.
+    Executes the 5-part test.
+    (This is preserved for methodological reproducibility).
     """
     print("\n" + "="*50)
     print("STARTING ABLATION STUDY")
     print("="*50)
     
     base_df = pd.read_csv(csv_path)
-    
-    # Create the ablated dataset (mimicking a CSV with bad/missing text)
-    # We use errors='ignore' so it doesn't crash if a column is already missing
     text_columns_to_drop = text_processing.detect_semantic_text_columns(base_df)
     ablated_df = base_df.drop(columns=text_columns_to_drop, errors='ignore')
     
     descriptions = {}
-    '''
+    
     # 1. Baseline AutoDDG (Full DF, No Images)
     print("\n>>> TEST 1: Baseline AutoDDG (Full Text, No Images)")
     descriptions["AutoDDG_Baseline"] = run_pipeline(base_df, image_folders=None, dataset_name=f"{DATASET_NAME} (Baseline)")
@@ -166,10 +167,11 @@ def run_ablation_study(csv_path: str, image_folders: list, persona: str = "gener
     # 4. Multimodal Baseline (KOESTEN PROMPT) <-- THE NEW TEST
     print("\n>>> TEST 4: Multimodal Koesten (Full Text, WITH Images, KOESTEN PROMPT)")
     descriptions["Multimodal_Koesten"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal + Koesten)", use_koesten_prompt=True, persona=persona)
-    '''
+    
     # 5. Multimodal Text-Ablated (Ablated DF, With Images)
     print("\n>>> TEST 5: Multimodal Ablated (No Semantic Text, WITH Images)")
     descriptions["Multimodal_Ablated"] = run_pipeline(ablated_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal Ablated)", use_koesten_prompt=True, persona=persona)
+    
     
     # STEP 5: Run Yuheng's Evaluator on the results
     print("\n" + "="*50)
@@ -198,13 +200,14 @@ def run_ablation_study(csv_path: str, image_folders: list, persona: str = "gener
 
 
 if __name__ == "__main__":
-    # --- CONFIGURATION FOR YOUR LOCAL MACHINE ---
-    TARGET_DIRECTORY = "./e-commerce"
-    assets = scan_dataset_directory(TARGET_DIRECTORY)
+    # --- DEFAULT EXECUTION ---
+    assets = scan_dataset_directory(DATA_PATH)
+    
+    if not assets['csv_files'] and not assets['image_folders']:
+        print("Error: No CSV or Image files found in the target directory.")
+        exit(1)
+    
     if not assets['csv_files']:
-        if not assets['image_folders']:
-            print("Error: No CSV or Image files found in the target directory.")
-            exit(1)
             
         print("\n--- IMAGE-ONLY DATASET DETECTED ---")
         print("No CSV found. Generating captions to construct a synthetic 1-column CSV...")
@@ -234,7 +237,22 @@ if __name__ == "__main__":
     print(f"Found base tabular data: {target_csv_path}")
     print(f"Found {len(detected_image_folders)} image folder(s).")
     
-    run_ablation_study(
-        csv_path=target_csv_path, 
-        image_folders=detected_image_folders, persona="general"  # You can switch to "general" if you want a more neutral description
+    base_df = pd.read_csv(target_csv_path)
+    
+    # 2. Run the main pipeline using the user's config
+    final_description = run_pipeline(
+        df=base_df, 
+        image_folders=detected_image_folders, 
+        dataset_name=DATASET_NAME, 
+        use_koesten_prompt=USE_KOESTEN_PROMPT, 
+        persona=PERSONA
     )
+    
+    # 3. Print the final result clearly to the terminal
+    print("\n" + "="*50)
+    print("FINAL GENERATED DESCRIPTION")
+    print("="*50)
+    print(final_description)
+    
+    # NOTE: If you wish to run the full research ablation study, uncomment the line below:
+    # run_ablation_study(csv_path=target_csv_path, image_folders=detected_image_folders, persona=PERSONA)
