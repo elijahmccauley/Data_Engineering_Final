@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 from openai import OpenAI
+import re
 
 from multimodal_autoddg import (
     profiling,
@@ -14,7 +15,7 @@ from multimodal_autoddg import (
 
 load_dotenv(".secrets")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-DATASET_NAME = "Amazon E-commerce"
+DATASET_NAME = "Amazon ecommerce"
 
 def scan_dataset_directory(base_path):
     """
@@ -63,37 +64,56 @@ def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str
             client=client
         )
     
-    # STEP 3: Image Profiling (If image folder provided)
+    # STEP 3: Image Profiling (Handles Local Folders AND URL Columns)
     image_semantic_summary = ""
     image_captions = []
     
+    # 3a. Check for local image folders
     if image_folders:
-        print(f"3. Processing Images across {len(image_folders)} folder(s) via BLIP...")
+        print(f"3a. Processing Images across {len(image_folders)} local folder(s) via BLIP...")
         for folder in image_folders:
             if os.path.exists(folder):
-                raw_captions = image_processing.generate_image_captions(folder, sample_size=30)
+                raw_captions = image_processing.generate_image_captions(folder, sample_size=50)
                 image_captions.extend([cap[0] for cap in raw_captions])
                 
-        if image_captions:
-            image_semantic_summary = image_processing.generate_image_semantic_summary(
-                dataset_name=dataset_name,
-                image_captions=image_captions,
-                client=client
-            )
+    # 3b. Check the DataFrame for image URL columns
+    url_pattern = re.compile(r'^https?://.*\.(?:jpg|jpeg|png|gif|webp).*$', re.IGNORECASE)
+    url_columns = []
+    
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            valid_sample = df[col].dropna().astype(str)
+            # If more than 50% of the column matches an image URL, tag it
+            if len(valid_sample) > 0 and valid_sample.str.match(url_pattern).mean() > 0.5:
+                url_columns.append(col)
+                
+    if url_columns:
+        print(f"3b. Processing Image URLs from column(s) {url_columns} via BLIP...")
+        for col in url_columns:
+            # generate_image_url_captions returns a list of strings directly
+            url_caps = image_processing.generate_image_url_captions(df, url_column=col, sample_size=50)
+            image_captions.extend(url_caps)
+
+    # 3c. Compress everything into a semantic summary
+    if image_captions:
+        print(f"   -> Compressing {len(image_captions)} total visual samples into a semantic summary...")
+        image_semantic_summary = image_processing.generate_image_semantic_summary(
+            dataset_name=dataset_name,
+            image_captions=image_captions,
+            client=client
+        )
     else:
-        print("3. No valid image folders detected. Skipping vision pipeline.")
+        print("3. No valid image folders or URL columns detected. Skipping vision pipeline.")
 
     # STEP 4: Routing to the correct Generator
     print(f"4. Generating Final Description with Persona: {persona}, (Koesten Prompt: {use_koesten_prompt})...")
     
     if image_captions and text_cols:
-        # 1. Full Multimodal (Tabular + Text + Image)
         desc = description_generation.generate_multimodal_description(
             dataset_name, compact_profile, text_semantic_summary, 
             text_samples, image_semantic_summary, image_captions, client=client, use_koesten_prompt=use_koesten_prompt, persona=persona
         )
     elif image_captions:
-        # 2. Tabular + Image (NO Semantic Text)
         desc = description_generation.generate_multimodal_description(
             dataset_name, compact_profile, 
             text_semantic_summary="No semantic text columns available in the base tabular data.", 
@@ -103,12 +123,10 @@ def run_pipeline(df: pd.DataFrame, image_folders: list = None, dataset_name: str
             client=client, use_koesten_prompt=use_koesten_prompt, persona=persona
         )
     elif text_cols:
-        # 3. Tabular + Text 
         desc = description_generation.generate_tabular_text_description(
             dataset_name, compact_profile, text_semantic_summary, text_samples, client=client, use_koesten_prompt=use_koesten_prompt
         )
     else:
-        # 4. Tabular Only (Original AutoDDG)
         desc = description_generation.generate_tabular_only_description(
             dataset_name, compact_profile, client=client, use_koesten_prompt=use_koesten_prompt
         )
@@ -132,7 +150,7 @@ def run_ablation_study(csv_path: str, image_folders: list, persona: str = "gener
     ablated_df = base_df.drop(columns=text_columns_to_drop, errors='ignore')
     
     descriptions = {}
-    
+    '''
     # 1. Baseline AutoDDG (Full DF, No Images)
     print("\n>>> TEST 1: Baseline AutoDDG (Full Text, No Images)")
     descriptions["AutoDDG_Baseline"] = run_pipeline(base_df, image_folders=None, dataset_name=f"{DATASET_NAME} (Baseline)")
@@ -148,7 +166,7 @@ def run_ablation_study(csv_path: str, image_folders: list, persona: str = "gener
     # 4. Multimodal Baseline (KOESTEN PROMPT) <-- THE NEW TEST
     print("\n>>> TEST 4: Multimodal Koesten (Full Text, WITH Images, KOESTEN PROMPT)")
     descriptions["Multimodal_Koesten"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal + Koesten)", use_koesten_prompt=True, persona=persona)
-    
+    '''
     # 5. Multimodal Text-Ablated (Ablated DF, With Images)
     print("\n>>> TEST 5: Multimodal Ablated (No Semantic Text, WITH Images)")
     descriptions["Multimodal_Ablated"] = run_pipeline(ablated_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal Ablated)", use_koesten_prompt=True, persona=persona)
@@ -218,5 +236,5 @@ if __name__ == "__main__":
     
     run_ablation_study(
         csv_path=target_csv_path, 
-        image_folders=detected_image_folders, persona="sales"  # You can switch to "general" if you want a more neutral description
+        image_folders=detected_image_folders, persona="general"  # You can switch to "general" if you want a more neutral description
     )
