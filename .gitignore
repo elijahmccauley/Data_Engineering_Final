@@ -2,3 +2,6 @@ amazon.csv
 e-commerce/
 .DS_Store
 .secrets
+dental_dataset/
+amazon_tech/
+__pycache__/
