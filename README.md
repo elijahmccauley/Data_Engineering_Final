@@ -6,18 +6,26 @@ This repository contains the codebase for our Multimodal Dataset Description Gen
 - **Python:** Python 3.10 or higher (3.10 - 3.11 is recommended for PyTorch/Transformers stability).
 - **Git:** To clone the repository.
 
+```markdown
 ## 1. Installation & Setup
 
 First, clone the repository and navigate into the project directory:
 ```bash
-git clone https://github.com/elijahmccauley/Data_Engineering_Final.git
+git clone [https://github.com/YOUR_USERNAME/Data_Engineering_Final.git](https://github.com/YOUR_USERNAME/Data_Engineering_Final.git)
 cd Data_Engineering_Final
 ```
 
-Next, install the required third-party Python packages:
+Next, install the required packages for the main Multimodal Pipeline:
 ```bash
 pip install -r requirements.txt
 ```
+
+*(Optional) Reproducing the Baseline:*
+If you wish to run `default_AutoDDG.ipynb` to reproduce the original baseline results from the paper, we recommend creating a separate virtual environment to avoid dependency conflicts with modern vision libraries. Install the baseline requirements using:
+```bash
+pip install -r baseline_requirements.txt
+```
+
 
 ### API Key Configuration
 In order to run the text semantic profiler and description generators, you will need an OpenAI API key. 

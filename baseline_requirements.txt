@@ -1,0 +1,5 @@
+python-dotenv
+pandas
+openai
+jupyter
+git+https://github.com/VIDA-NYU/AutoDDG@main
