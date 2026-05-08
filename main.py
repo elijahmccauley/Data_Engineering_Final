@@ -164,7 +164,7 @@ def run_ablation_study(csv_path: str, image_folders: list, persona: str = "gener
     print("\n>>> TEST 3: Multimodal Baseline (Full Text, WITH Images)")
     descriptions["Multimodal_Baseline"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal)", persona=persona)
     
-    # 4. Multimodal Baseline (KOESTEN PROMPT) <-- THE NEW TEST
+    # 4. Multimodal Baseline (KOESTEN PROMPT) (Full DF, With Images)
     print("\n>>> TEST 4: Multimodal Koesten (Full Text, WITH Images, KOESTEN PROMPT)")
     descriptions["Multimodal_Koesten"] = run_pipeline(base_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal + Koesten)", use_koesten_prompt=True, persona=persona)
     
@@ -173,7 +173,7 @@ def run_ablation_study(csv_path: str, image_folders: list, persona: str = "gener
     descriptions["Multimodal_Ablated"] = run_pipeline(ablated_df, image_folders=image_folders, dataset_name=f"{DATASET_NAME} (Multimodal Ablated)", use_koesten_prompt=True, persona=persona)
     
     
-    # STEP 5: Run Yuheng's Evaluator on the results
+    # STEP 5: Run Yuheng's Evaluator on the results -- This is the defunct quantitative evaluator which failed to produce meaningful results, but we preserve it here for reproducibility and transparency.
     print("\n" + "="*50)
     print("RUNNING LLM JUDGE (Pointwise Evaluation)")
     print("="*50)

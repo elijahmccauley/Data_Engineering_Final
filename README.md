@@ -26,7 +26,6 @@ If you wish to run `default_AutoDDG.ipynb` to reproduce the original baseline re
 pip install -r baseline_requirements.txt
 ```
 
-
 ### API Key Configuration
 In order to run the text semantic profiler and description generators, you will need an OpenAI API key. 
 1. We have provided a `.secrets.example` file in the repository.
@@ -84,7 +83,9 @@ Once downloaded and extracted, organize the data folders at the root of your rep
 ├── autoddg_workflow.png
 ├── config.py
 ├── main.py
-└── requirements.txt
+├── requirements.txt
+├── baseline_requirements.txt
+└── default_AutoDDG.ipynb
 ```
 
 ## 4. Usage

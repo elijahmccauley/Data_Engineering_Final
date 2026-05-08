@@ -351,7 +351,7 @@ def evaluate_question_based(
 
     return results
 
-
+# This is the prompt we use for the manual evaluation of the descriptions against the 9 questions using the 3 llm judges.
 KOESTEN_PROMPT = """You are an expert Data Scientist and a strict Dataset Catalog Evaluator. 
 Your task is to evaluate a generated dataset description based on how well it answers a specific set of 9 questions.
 
